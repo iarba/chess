@@ -1,4 +1,5 @@
 #include "chess.hpp"
+#include <cstring>
 
 /* Board implementation */
 
@@ -31,6 +32,7 @@ Board::Board()
   pieces[7][5].set_piece(WHITE, BISHOP, 0);
   pieces[7][6].set_piece(WHITE, KNIGHT, 0);
   pieces[7][7].set_piece(WHITE, ROOK  , 0);
+  en_passant_row = -1;
 }
 
 Board::Board(Board& other)
@@ -50,6 +52,7 @@ Board::Board(Board& other)
   }
   white_to_move = other.white_to_move;
   history = other.history;
+  en_passant_row = other.en_passant_row;
 }
 
 Board::~Board()
@@ -66,25 +69,28 @@ Board::~Board()
 int Board::can_move(Move m)
 {
   int i, j;
+  color c1 = pieces[m.px1][m.py1].color, c2 = pieces[m.px2][m.py2].color;
+  type t1 = pieces[m.px1][m.py1].type, t2 = pieces[m.px2][m.py2].type;
+  int s1 = pieces[m.px1][m.py1].special, s2 = pieces[m.px2][m.py2].special;
   if(m.special == 'O') // castling
   {
-    if(piece[m.px1][m.py1].type != ROOK)
+    if(t1 != ROOK)
     {
       return 100; // not a rook
     }
-    if(piece[m.px2][m.py2].type != KING)
+    if(t2.type != KING)
     {
       return 101; // not a king
     }
-    if(piece[m.px1][m.py1].special)
+    if(s1)
     {
       return 102; // rook moved
     }
-    if(piece[m.px2][m.py2].special)
+    if(s2)
     {
       return 103; // king moved
     }
-    if(piece[m.px1][m.py1].color != piece[m.px2][m.py2].color)
+    if(c1 != c2)
     {
       return 104; // different colors
     }
@@ -121,29 +127,45 @@ int Board::can_move(Move m)
   }
   if(m.special == 'E') // en passant
   {
-    if(piece[m.px1][m.py1].type != PAWN)
+// rework enpassant :(
+    if(t1 != PAWN)
     {
       return 200; // not a pawn
     }
-    if(piece[m.px2][m.py2].type != PAWN)
+    if(t2 != PAWN)
     {
       return 201; // not a pawn
     }
-    if(piece[m.px2][m.py2].special != 1)
+    if(s2 != 1)
     {
       return 202; // pawn not in place, moved twice
     }
-    if((m.py2 != 4) && (m.py2 != 5))
+    if((m.px2 != 3) && (m.px2 != 4))
     {
       return 203; // pawn not in place, wrong position
     }
-    if(piece[m.px1][m.py1].color = piece[m.px2][m.py2].color)
+    if(c1 == c2)
     {
       return 204; // same colors
     }
     if(en_passant_row != m.py2)
     {
       return 205; // en passant expired
+    }
+    if(m.px1 )
+    {
+      return 206; // invalid attack pattern
+    }
+  }
+  if(strchr("ROOK_L KNIGHT_L BISHOP_L QUEEN_L", m.special)) // promotion move
+  {
+    if((t2 != NOTHING) && (c1 == c2))
+    {
+      return 300; // same colors
+    }
+    if(t1 != PAWN)
+    {
+      return 301; // not a pawn
     }
   }
   return 0;
@@ -153,6 +175,7 @@ int Board::do_move(Move m)
 {
   if(can_move(m) == 0)
   {
+    en_passant_row == -1;
     history.push_back(m);
     Type t;
     Color c;
@@ -199,6 +222,10 @@ int Board::do_move(Move m)
     {
       c = pieces[m.px1][m.py1].color;
       t = pieces[m.px1][m.py1].type;
+      if((t == PAWN) && (abs(m.px1 - m.px2) == 2))
+      {
+        en_passant_row = m.px1; // in the event it is actually required
+      }
       s = pieces[m.px1][m.py1].special;
       pieces[m.px2][m.py2].set_piece(c, t, s + 1); // piece movement
       pieces[m.px1][m.py1].set_type(NOTHING); // the old piece is removed

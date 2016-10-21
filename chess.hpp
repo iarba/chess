@@ -46,6 +46,8 @@ public:
   bool white_to_move;
   Piece **pieces;
   vector<Move> history;
+private:
+  int en_passant_row;
 };
 
 #endif
