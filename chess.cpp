@@ -1,5 +1,6 @@
 #include "chess.hpp"
 #include <cstring>
+#include <cmath>
 
 /* Board implementation */
 
@@ -32,7 +33,7 @@ Board::Board()
   pieces[7][5].set_piece(WHITE, BISHOP, 0);
   pieces[7][6].set_piece(WHITE, KNIGHT, 0);
   pieces[7][7].set_piece(WHITE, ROOK  , 0);
-  en_passant_row = -1;
+  en_passant_loc = -1;
 }
 
 Board::Board(Board& other)
@@ -52,7 +53,7 @@ Board::Board(Board& other)
   }
   white_to_move = other.white_to_move;
   history = other.history;
-  en_passant_row = other.en_passant_row;
+  en_passant_loc = other.en_passant_loc;
 }
 
 Board::~Board()
@@ -68,104 +69,251 @@ Board::~Board()
 
 int Board::can_move(Move m)
 {
+  if((m.px1 < 0) || (m.py1 < 0) || (m.px1 < 0) || (m.py1 < 0))
+  {
+    return BASIC_INVALID_MOVE;
+  }
   int i, j;
-  color c1 = pieces[m.px1][m.py1].color, c2 = pieces[m.px2][m.py2].color;
-  type t1 = pieces[m.px1][m.py1].type, t2 = pieces[m.px2][m.py2].type;
-  int s1 = pieces[m.px1][m.py1].special, s2 = pieces[m.px2][m.py2].special;
+  j = MAX_CHESS_SIZE;
+  if((m.px1 >= j) || (m.py1 >= j) || (m.px1 >= j) || (m.py1 >= j))
+  {
+    return BASIC_INVALID_MOVE;
+  }
+  color c1 = pieces[m.px1][m.py1].color;
+  if((c1 == WHITE) && (! white_to_move))
+  {
+    return BASIC_WRONG_COLOR;
+  }
+  if((c1 == BLACK) && (white_to_move))
+  {
+    return BASIC_WRONG_COLOR;
+  }
+  color c2 = pieces[m.px2][m.py2].color;
+  type t1 = pieces[m.px1][m.py1].type;
+  type t2 = pieces[m.px2][m.py2].type;
+  int m1 = pieces[m.px1][m.py1].moves;
+  int m2 = pieces[m.px2][m.py2].moves;
   if(m.special == 'O') // castling
   {
     if(t1 != ROOK)
     {
-      return 100; // not a rook
+      return CASTLING_NOT_ROOK;
     }
     if(t2.type != KING)
     {
-      return 101; // not a king
+      return CASTLING_NOT_KING;
     }
-    if(s1)
+    if(m1)
     {
-      return 102; // rook moved
+      return CASTLING_ROOK_MOVED;
     }
-    if(s2)
+    if(m2)
     {
-      return 103; // king moved
+      return CASTLING_KING_MOVED;
     }
     if(c1 != c2)
     {
-      return 104; // different colors
+      return CASTLING_COLOR;
     }
-    if(m.py1 != m.py2)
+    if(m.px1 != m.px2)
     {
-      return 105; // not on the same row
+      return CASTLING_NOT_SAME_ROW;
     }
-    for(i = m.px1 + 1; i < m.px2; i++)
+    // the 2 fors checks for both king' and queen's side castling
+    for(i = m.py1 + 1; i < m.py2; i++)
     {
-      if(piece[i][m.py2].type != NOTHING)
+      if(piece[m.px2][i].type != NOTHING)
       {
-        return 106; // something in the way
+        return CASTLING_OCCUPIED;
       }
-      if(is_threatened(i, m.py2) && (i != m.px1 + 1))
+      if(is_threatened(m.px2, i) && (i != m.py1 + 1))
       {
-        return 107; // position threatened
-      }
-    }
-    for(i = m.px1 - 1; i > m.px2; i--)
-    {
-      if(piece[i][m.py2].type != NOTHING)
-      {
-        return 106; // something in the way
-      }
-      if(is_threatened(i, m.py2))
-      {
-        return 107; // position threatened
+        return CASTLING_CHECK;
       }
     }
-    if(is_threatened(m.py1, m.py2))
+    for(i = m.py1 - 1; i > m.py2; i--)
     {
-      return 1; // in check
+      if(piece[m.px2][i].type != NOTHING)
+      {
+        return CASTLING_OCCUPIED;
+      }
+      if(is_threatened(m.px2, i))
+      {
+        return CASTLING_CHECK;
+      }
+    }
+    if(is_threatened(m.px2, m.py2))
+    {
+      return CASTLING_CHECK;
     }
   }
   if(m.special == 'E') // en passant
   {
-// rework enpassant :(
+    color c2 = pieces[m.px1][m.py2].color;
+    type t2 = pieces[m.px1][m.py2].type;
+    int m2 = pieces[m.px1][m.py2].moves;
     if(t1 != PAWN)
     {
-      return 200; // not a pawn
+      return PASSANT_NOT_PAWN_O;
     }
     if(t2 != PAWN)
     {
-      return 201; // not a pawn
+      return PASSANT_NOT_PAWN_T;
     }
-    if(s2 != 1)
+    if(m2 != 1)
     {
-      return 202; // pawn not in place, moved twice
+      return PASSANT_INVALID_MOVE;
     }
-    if((m.px2 != 3) && (m.px2 != 4))
+    if((m.px1 != 3) && (m.px1 != 4))
     {
-      return 203; // pawn not in place, wrong position
+      return PASSANT_INVALID_LOC;
     }
     if(c1 == c2)
     {
-      return 204; // same colors
+      return PASSANT_WRONG_COLOR;
     }
-    if(en_passant_row != m.py2)
+    if(en_passant_loc != m.py2)
     {
-      return 205; // en passant expired
+      return PASSANT_EXPIRED;
     }
-    if(m.px1 )
+    if(abs(m.py2 - m.py1) != 1)
     {
-      return 206; // invalid attack pattern
+      return PASSANT_INVALID;
+    }
+    if(white_to_move)
+    {
+      if(m.px1 - m.px2 != 1)
+      {
+        return PASSANT_INVALID;
+      }
+    }
+    else
+    {
+      if(m.px2 - m.px1 != 1)
+      {
+        return PASSANT_INVALID;
+      }
     }
   }
-  if(strchr("ROOK_L KNIGHT_L BISHOP_L QUEEN_L", m.special)) // promotion move
-  {
+  if(strchr("ROOK_L KNIGHT_L BISHOP_L QUEEN_L", m.special) && (m.special != 0))
+  { // promotion move
+    if((m.px2 != 0) && (m.px2 != 7))
+    {
+      return PROMOTE_NO;
+    }
     if((t2 != NOTHING) && (c1 == c2))
     {
-      return 300; // same colors
+      return PROMOTE_COLOR;
     }
     if(t1 != PAWN)
     {
-      return 301; // not a pawn
+      return PROMOTE_PAWN;
+    }
+    if(abs(m.py2 - m.py1) > 1)
+    {
+      return PROMOTE_INVALID;
+    }
+    if((abs(m.py2 - m.py1) == 1) && (t2 == NOTHING))
+    {
+      return PROMOTE_NO_CAPTURE;
+    }
+    if((abs(m.py2 - m.py1) == 0) && (t2 != NOTHING))
+    {
+      return PROMOTE_BLOCKED;
+    }
+    if(white_to_move)
+    {
+      if(m.px1 - m.px2 != 1)
+      {
+        return PROMOTE_INVALID;
+      }
+    }
+    else
+    {
+      if(m.px2 - m.px1 != 1)
+      {
+        return PROMOTE_INVALID;
+      }
+    }
+  }
+  if(m.special == 0) // normal move
+  {
+    if(t1 == PAWN) // pawn movement
+    {
+      if(abs(m.px2 - m.px1) == 2) // forward 2
+      {
+        if(s1)
+        {
+          return PAWN_FORWARD_EXPIRED;
+        }
+        if(m.py1 != m.py2)
+        {
+          return PAWN_INVALID;
+        }
+        if(white_to_move)
+        {
+          if(m.px1 - m.px2 != 2)
+          {
+            return PAWN_INVALID;
+          }
+          if(pieces[m.px1 - 1][m.py1].type != NOTHING)
+          {
+            return PAWN_BLOCKED;
+          }
+        }
+        else
+        {
+          if(m.px2 - m.px1 != 2)
+          {
+            return PAWN_INVALID;
+          }
+          if(pieces[m.px1 + 1][m.py1].type != NOTHING)
+          {
+            return PAWN_BLOCKED;
+          }
+        }
+        if(t2 != NOTHING)
+        {
+          return PAWN_BLOCKED;
+        }
+      }
+      else // forward 1 or capture
+      {
+        if(white_to_move)
+        {
+          if(m.px1 - m.px2 != 1)
+          {
+            return PAWN_INVALID;
+          }
+        }
+        else
+        {
+          if(m.px2 - m.px1 != 1)
+          {
+            return PAWN_INVALID;
+          }
+        }
+        if((t2 != NOTHING) && (c1 == c2))
+        {
+          return PAWN_COLOR;
+        }
+        if(abs(m.py2 - m.py1) > 1)
+        {
+          return PAWN_INVALID;
+        }
+        if((abs(m.py2 - m.py1) == 1) && (t2 == NOTHING))
+        {
+          return PAWN_NO_CAPTURE;
+        }
+        if((abs(m.py2 - m.py1) == 0) && (t2 != NOTHING))
+        {
+          return PAWN_BLOCKED;
+        }
+      }
+    }
+    if(t1 == ROOK) // rook movement
+    {
+    // TODO continue
     }
   }
   return 0;
@@ -175,7 +323,7 @@ int Board::do_move(Move m)
 {
   if(can_move(m) == 0)
   {
-    en_passant_row == -1;
+    en_passant_loc == -1;
     history.push_back(m);
     Type t;
     Color c;
@@ -187,10 +335,10 @@ int Board::do_move(Move m)
         c = pieces[m.px1][m.py1].color;
         t = pieces[m.px1][m.py1].type;
         s = pieces[m.px1][m.py1].special;
-        pieces[m.px2][m.py2 - 1].set_piece(c, t, s + 1); // rook movement
+        pieces[m.px2][m.py2 - 1].set_piece(c, t, m + 1); // rook movement
         t = pieces[m.px2][m.py2].type;
         s = pieces[m.px2][m.py2].special;
-        pieces[m.px2][m.py2 - 2].set_piece(c, t, s + 1); // king movement
+        pieces[m.px2][m.py2 - 2].set_piece(c, t, m + 1); // king movement
         pieces[m.px1][m.py1].set_type(NOTHING); // the old rook is removed
         pieces[m.px2][m.py2].set_type(NOTHING); // the old king is removed
       }
@@ -199,10 +347,10 @@ int Board::do_move(Move m)
         c = pieces[m.px1][m.py1].color;
         t = pieces[m.px1][m.py1].type;
         s = pieces[m.px1][m.py1].special;
-        pieces[m.px2][m.py2 + 1].set_piece(c, t, s + 1); // rook movement
+        pieces[m.px2][m.py2 + 1].set_piece(c, t, m + 1); // rook movement
         t = pieces[m.px2][m.py2].type;
         s = pieces[m.px2][m.py2].special;
-        pieces[m.px2][m.py2 + 2].set_piece(c, t, s + 1); // king movement
+        pieces[m.px2][m.py2 + 2].set_piece(c, t, m + 1); // king movement
         pieces[m.px1][m.py1].set_type(NOTHING); // the old rook is removed
         pieces[m.px2][m.py2].set_type(NOTHING); // the old king is removed
       }
@@ -213,9 +361,9 @@ int Board::do_move(Move m)
       c = pieces[m.px1][m.py1].color;
       t = pieces[m.px1][m.py1].type;
       s = pieces[m.px1][m.py1].special;
-      pieces[m.px2][m.py2].set_piece(c, t, s + 1); // pawn movement
+      pieces[m.px2][m.py2].set_piece(c, t, m + 1); // pawn movement
       pieces[m.px1][m.py1].set_type(NOTHING); // the old pawn is removed
-      pieces[m.px2][m.py1].set_type(NOTHING); // the pawn is captured
+      pieces[m.px1][m.py2].set_type(NOTHING); // the pawn is captured
       return 0;
     }
     if(m.special == 0) // normal move
@@ -224,10 +372,10 @@ int Board::do_move(Move m)
       t = pieces[m.px1][m.py1].type;
       if((t == PAWN) && (abs(m.px1 - m.px2) == 2))
       {
-        en_passant_row = m.px1; // in the event it is actually required
+        en_passant_loc = m.py2; // in the event it is actually required
       }
       s = pieces[m.px1][m.py1].special;
-      pieces[m.px2][m.py2].set_piece(c, t, s + 1); // piece movement
+      pieces[m.px2][m.py2].set_piece(c, t, m + 1); // piece movement
       pieces[m.px1][m.py1].set_type(NOTHING); // the old piece is removed
       return 0;
     }
@@ -247,7 +395,7 @@ int Board::do_move(Move m)
         default       : return -1;
       }
       s = pieces[m.px1][m.py1].special;
-      pieces[m.px2][m.py2].set_piece(c, t, s + 1); // piece movement
+      pieces[m.px2][m.py2].set_piece(c, t, m + 1); // piece movement
       pieces[m.px1][m.py1].set_type(NOTHING); // the old piece is removed
       return 0;
     }
@@ -262,11 +410,11 @@ Piece::Piece()
   type = NOTHING;
 }
 
-void Piece::set_piece(Color c, Type t, int s)
+void Piece::set_piece(Color c, Type t, int m)
 {
   color = c;
   type = t;
-  special = s;
+  moves = m;
 }
 
 void Piece::set_type(Type t)

@@ -2,3 +2,6 @@
 *.o
 # precomputed headers
 *.gch
+# temporary files
+*~
+

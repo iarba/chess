@@ -19,11 +19,11 @@ class Piece
 {
 public:
   Piece();
-  void set_piece(Color c, Type t, int s);
+  void set_piece(Color c, Type t, int m);
   void set_type(Type t);
   Color color;
   Type type;
-  int special;
+  int moves;
 };
 
 class Move
@@ -47,7 +47,7 @@ public:
   Piece **pieces;
   vector<Move> history;
 private:
-  int en_passant_row;
+  int en_passant_loc;
 };
 
 #endif
