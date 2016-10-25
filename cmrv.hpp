@@ -4,7 +4,6 @@
 #define BASIC_CHECK 1
 #define BASIC_INVALID_MOVE 2
 #define BASIC_NO_PIECE 3
-#define BASIC_TERRIBLE 99
 #define BASIC_WRONG_COLOR 4
 #define BISHOP_BLOCKED 101
 #define BISHOP_COLOR 102
@@ -46,5 +45,6 @@
 #define ROOK_BLOCKED 801;
 #define ROOK_COLOR 802;
 #define ROOK_INVALID 803;
+#define BASIC_TERRIBLE 99
 
 #endif

@@ -43,11 +43,12 @@ public:
   int can_move(Move m);
   int do_move(Move m);
   int get_status();
-  bool is_threatened();
+  bool is_threatened(int px, int py);
   bool white_to_move;
   Piece **pieces;
   vector<Move> history;
-private:
+  int testing;
+protected:
   int en_passant_loc;
 };
 

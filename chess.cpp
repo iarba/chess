@@ -35,6 +35,8 @@ Board::Board()
   pieces[7][6].set_piece(WHITE, KNIGHT, 0);
   pieces[7][7].set_piece(WHITE, ROOK  , 0);
   en_passant_loc = -1;
+  white_to_move = true;
+  testing = 0;
 }
 
 Board::Board(Board& other)
@@ -47,7 +49,7 @@ Board::Board(Board& other)
   }
   for(i = 0; i < MAX_CHESS_SIZE; i++)
   {
-    for(i = 0; i < MAX_CHESS_SIZE; i++)
+    for(j = 0; j < MAX_CHESS_SIZE; j++)
     {
       pieces[i][j] = other.pieces[i][j];
     }
@@ -55,6 +57,7 @@ Board::Board(Board& other)
   white_to_move = other.white_to_move;
   history = other.history;
   en_passant_loc = other.en_passant_loc;
+  testing = other.testing;
 }
 
 Board::~Board()
@@ -80,7 +83,7 @@ int Board::can_move(Move m)
   {
     return BASIC_INVALID_MOVE;
   }
-  color c1 = pieces[m.px1][m.py1].color;
+  Color c1 = pieces[m.px1][m.py1].color;
   if((c1 == WHITE) && (! white_to_move))
   {
     return BASIC_WRONG_COLOR;
@@ -89,13 +92,13 @@ int Board::can_move(Move m)
   {
     return BASIC_WRONG_COLOR;
   }
-  color c2 = pieces[m.px2][m.py2].color;
-  type t1 = pieces[m.px1][m.py1].type;
+  Color c2 = pieces[m.px2][m.py2].color;
+  Type t1 = pieces[m.px1][m.py1].type;
   if(t1 == NOTHING)
   {
     return BASIC_NO_PIECE;
   }
-  type t2 = pieces[m.px2][m.py2].type;
+  Type t2 = pieces[m.px2][m.py2].type;
   int m1 = pieces[m.px1][m.py1].moves;
   int m2 = pieces[m.px2][m.py2].moves;
   if(m.special == 'O') // castling
@@ -104,7 +107,7 @@ int Board::can_move(Move m)
     {
       return CASTLING_NOT_ROOK;
     }
-    if(t2.type != KING)
+    if(t2 != KING)
     {
       return CASTLING_NOT_KING;
     }
@@ -127,7 +130,7 @@ int Board::can_move(Move m)
     // the 2 fors checks for both king' and queen's side castling
     for(i = m.py1 + 1; i < m.py2; i++)
     {
-      if(piece[m.px2][i].type != NOTHING)
+      if(pieces[m.px2][i].type != NOTHING)
       {
         return CASTLING_OCCUPIED;
       }
@@ -138,7 +141,7 @@ int Board::can_move(Move m)
     }
     for(i = m.py1 - 1; i > m.py2; i--)
     {
-      if(piece[m.px2][i].type != NOTHING)
+      if(pieces[m.px2][i].type != NOTHING)
       {
         return CASTLING_OCCUPIED;
       }
@@ -154,8 +157,8 @@ int Board::can_move(Move m)
   }
   if(m.special == 'E') // en passant
   {
-    color c2 = pieces[m.px1][m.py2].color;
-    type t2 = pieces[m.px1][m.py2].type;
+    Color c2 = pieces[m.px1][m.py2].color;
+    Type t2 = pieces[m.px1][m.py2].type;
     int m2 = pieces[m.px1][m.py2].moves;
     if(t1 != PAWN)
     {
@@ -247,7 +250,7 @@ int Board::can_move(Move m)
     {
       if(abs(m.px2 - m.px1) == 2) // forward 2
       {
-        if(s1)
+        if(m1)
         {
           return PAWN_FORWARD_EXPIRED;
         }
@@ -336,14 +339,14 @@ int Board::can_move(Move m)
       }
       for(i = m.py1 + 1; i < m.py2; i++)
       {
-        if(piece[m.px2][i].type != NOTHING)
+        if(pieces[m.px2][i].type != NOTHING)
         {
           return ROOK_BLOCKED;
         }
       }
       for(i = m.px1 + 1; i < m.px2; i++)
       {
-        if(piece[i][py2].type != NOTHING)
+        if(pieces[i][m.py2].type != NOTHING)
         {
           return ROOK_BLOCKED;
         }
@@ -361,6 +364,7 @@ int Board::can_move(Move m)
       {
         return KNIGHT_COLOR;
       }
+    }
     if(t1 == BISHOP) // bishop movement
     {
       int dx = abs(m.px1 - m.px2);
@@ -384,7 +388,7 @@ int Board::can_move(Move m)
       }
       for(i = 1; i < dx; i++)
       {
-        if(piece[m.px1 + fx * i][m.py1 + fy * i].type != NOTHING)
+        if(pieces[m.px1 + fx * i][m.py1 + fy * i].type != NOTHING)
         {
           return BISHOP_BLOCKED;
         }
@@ -402,14 +406,14 @@ int Board::can_move(Move m)
       { // rook type movement
         for(i = m.py1 + 1; i < m.py2; i++)
         {
-          if(piece[m.px2][i].type != NOTHING)
+          if(pieces[m.px2][i].type != NOTHING)
           {
             return QUEEN_BLOCKED;
           }
         }
         for(i = m.px1 + 1; i < m.px2; i++)
         {
-          if(piece[i][py2].type != NOTHING)
+          if(pieces[i][m.py2].type != NOTHING)
           {
             return QUEEN_BLOCKED;
           }
@@ -432,7 +436,7 @@ int Board::can_move(Move m)
         }
         for(i = 1; i < dx; i++)
         {
-          if(piece[m.px1 + fx * i][m.py1 + fy * i].type != NOTHING)
+          if(pieces[m.px1 + fx * i][m.py1 + fy * i].type != NOTHING)
           {
             return QUEEN_BLOCKED;
           }
@@ -455,7 +459,8 @@ int Board::can_move(Move m)
   }
   // test the move to see if it puts you into check
   Board test_board(*this);
-  if(test_board.do_move(m)
+  test_board.testing = 1;
+  if(test_board.do_move(m))
   {
     return BASIC_TERRIBLE;
   }
@@ -477,82 +482,86 @@ int Board::can_move(Move m)
 
 int Board::do_move(Move m)
 {
-  if(can_move(m) == 0)
+  if((testing) || (can_move(m) == 0))
   {
-    en_passant_loc == -1;
+    en_passant_loc = -1;
     history.push_back(m);
-    Type t;
-    Color c;
-    int s;
+    Type t0;
+    Color c0;
+    int m0;
     if(m.special == 'O') // castling
     {
       if(m.px1 == 0) // on queen's side
       {
-        c = pieces[m.px1][m.py1].color;
-        t = pieces[m.px1][m.py1].type;
-        s = pieces[m.px1][m.py1].special;
-        pieces[m.px2][m.py2 - 1].set_piece(c, t, m + 1); // rook movement
-        t = pieces[m.px2][m.py2].type;
-        s = pieces[m.px2][m.py2].special;
-        pieces[m.px2][m.py2 - 2].set_piece(c, t, m + 1); // king movement
+        c0 = pieces[m.px1][m.py1].color;
+        t0 = pieces[m.px1][m.py1].type;
+        m0 = pieces[m.px1][m.py1].moves;
+        pieces[m.px2][m.py2 - 1].set_piece(c0, t0, m0 + 1); // rook movement
+        t0 = pieces[m.px2][m.py2].type;
+        m0 = pieces[m.px2][m.py2].moves;
+        pieces[m.px2][m.py2 - 2].set_piece(c0, t0, m0 + 1); // king movement
         pieces[m.px1][m.py1].set_type(NOTHING); // the old rook is removed
         pieces[m.px2][m.py2].set_type(NOTHING); // the old king is removed
       }
       else // on king's side
       {
-        c = pieces[m.px1][m.py1].color;
-        t = pieces[m.px1][m.py1].type;
-        s = pieces[m.px1][m.py1].special;
-        pieces[m.px2][m.py2 + 1].set_piece(c, t, m + 1); // rook movement
-        t = pieces[m.px2][m.py2].type;
-        s = pieces[m.px2][m.py2].special;
-        pieces[m.px2][m.py2 + 2].set_piece(c, t, m + 1); // king movement
+        c0 = pieces[m.px1][m.py1].color;
+        t0 = pieces[m.px1][m.py1].type;
+        m0 = pieces[m.px1][m.py1].moves;
+        pieces[m.px2][m.py2 + 1].set_piece(c0, t0, m0 + 1); // rook movement
+        t0 = pieces[m.px2][m.py2].type;
+        m0 = pieces[m.px2][m.py2].moves;
+        pieces[m.px2][m.py2 + 2].set_piece(c0, t0, m0 + 1); // king movement
         pieces[m.px1][m.py1].set_type(NOTHING); // the old rook is removed
         pieces[m.px2][m.py2].set_type(NOTHING); // the old king is removed
       }
+      white_to_move = ! white_to_move;
       return 0;
     }
     if(m.special == 'E') // en passant
     {
-      c = pieces[m.px1][m.py1].color;
-      t = pieces[m.px1][m.py1].type;
-      s = pieces[m.px1][m.py1].special;
-      pieces[m.px2][m.py2].set_piece(c, t, m + 1); // pawn movement
+      c0 = pieces[m.px1][m.py1].color;
+      t0 = pieces[m.px1][m.py1].type;
+      m0 = pieces[m.px1][m.py1].moves;
+      pieces[m.px2][m.py2].set_piece(c0, t0, m0 + 1); // pawn movement
       pieces[m.px1][m.py1].set_type(NOTHING); // the old pawn is removed
       pieces[m.px1][m.py2].set_type(NOTHING); // the pawn is captured
+      white_to_move = ! white_to_move;
       return 0;
     }
     if(m.special == 0) // normal move
     {
-      c = pieces[m.px1][m.py1].color;
-      t = pieces[m.px1][m.py1].type;
-      if((t == PAWN) && (abs(m.px1 - m.px2) == 2))
+      c0 = pieces[m.px1][m.py1].color;
+      t0 = pieces[m.px1][m.py1].type;
+      if((t0 == PAWN) && (abs(m.px1 - m.px2) == 2))
       {
         en_passant_loc = m.py2; // in the event it is actually required
       }
-      s = pieces[m.px1][m.py1].special;
-      pieces[m.px2][m.py2].set_piece(c, t, m + 1); // piece movement
+      m0 = pieces[m.px1][m.py1].moves;
+      pieces[m.px2][m.py2].set_piece(c0, t0, m0 + 1); // piece movement
       pieces[m.px1][m.py1].set_type(NOTHING); // the old piece is removed
+      white_to_move = ! white_to_move;
       return 0;
     }
     if(m.special != 0) // promotion move
     {
-      c = pieces[m.px1][m.py1].color;
+      c0 = pieces[m.px1][m.py1].color;
       switch(m.special)
       {
-        case ROOK_L   : t = ROOK;
+        case ROOK_L   : t0 = ROOK;
                         break;
-        case KNIGHT_L : t = KNIGHT;
+        case KNIGHT_L : t0 = KNIGHT;
                         break;
-        case BISHOP_L : t = BISHOP;
+        case BISHOP_L : t0 = BISHOP;
                         break;
-        case QUEEN_L  : t = QUEEN;
+        case QUEEN_L  : t0 = QUEEN;
                         break;
         default       : return -1;
       }
-      s = pieces[m.px1][m.py1].special;
-      pieces[m.px2][m.py2].set_piece(c, t, m + 1); // piece movement
+      m0 = pieces[m.px1][m.py1].moves;
+      pieces[m.px2][m.py2].set_piece(c0, t0, m0 + 1); // piece movement
       pieces[m.px1][m.py1].set_type(NOTHING); // the old piece is removed
+      white_to_move = ! white_to_move;
       return 0;
     }
   }
@@ -566,12 +575,12 @@ int Board::get_status()
   {
     for(j = 0; j < MAX_CHESS_SIZE; j++)
     {
-      if(piece[i][j].type == KING)
+      if(pieces[i][j].type == KING)
       {
         if(is_threatened(i, j))
         {
           result++;
-          if(piece[i][j].color == BLACK)
+          if(pieces[i][j].color == BLACK)
           {
             result++;
           }
@@ -616,20 +625,4 @@ Move::Move(char px1, int py1, char px2, int py2, char special)
   this -> py2 = py2 - 1;
   this -> special = special;
 }
-
-/*
-class Board
-{
-public:
-  Board(Board& other);
-  ~Board();
-  int can_move(Move m);
-  int do_move(Move m);
-  bool white_to_move;
-  int get_status();
-  Piece** pieces;
-  vector<Move> history;
-}
-*/
-
 
