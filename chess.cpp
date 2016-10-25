@@ -157,6 +157,7 @@ int Board::can_move(Move m)
   }
   if(m.special == 'E') // en passant
   {
+    cout << "en passant attempted";
     Color c2 = pieces[m.px1][m.py2].color;
     Type t2 = pieces[m.px1][m.py2].type;
     int m2 = pieces[m.px1][m.py2].moves;
