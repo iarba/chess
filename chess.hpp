@@ -43,11 +43,19 @@ public:
   int can_move(Move m);
   int do_move(Move m);
   int get_status();
+  bool is_threatened();
   bool white_to_move;
   Piece **pieces;
   vector<Move> history;
 private:
   int en_passant_loc;
 };
+
+/* Board statuses:
+ * 0 - nothing happened
+ * 1 - white is in check
+ * 2 - black is in check
+ * 3 - both players are in check
+ */
 
 #endif

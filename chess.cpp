@@ -90,6 +90,10 @@ int Board::can_move(Move m)
   }
   color c2 = pieces[m.px2][m.py2].color;
   type t1 = pieces[m.px1][m.py1].type;
+  if(t1 == NOTHING)
+  {
+    return BASIC_NO_PIECE;
+  }
   type t2 = pieces[m.px2][m.py2].type;
   int m1 = pieces[m.px1][m.py1].moves;
   int m2 = pieces[m.px2][m.py2].moves;
@@ -285,12 +289,20 @@ int Board::can_move(Move m)
           {
             return PAWN_INVALID;
           }
+          if(m.px2 == 0)
+          {
+            return PAWN_PROMOTION;
+          }
         }
         else
         {
           if(m.px2 - m.px1 != 1)
           {
             return PAWN_INVALID;
+          }
+          if(m.px2 == 7)
+          {
+            return PAWN_PROMOTION;
           }
         }
         if((t2 != NOTHING) && (c1 == c2))
@@ -313,8 +325,151 @@ int Board::can_move(Move m)
     }
     if(t1 == ROOK) // rook movement
     {
-    // TODO continue
+      if((m.px1 != m.px2) && (m.py1 != m.py2))
+      {
+        return ROOK_INVALID;
+      }
+      if((t2 != NOTHING) && (c1 != c2))
+      {
+        return ROOK_COLOR;
+      }
+      for(i = m.py1 + 1; i < m.py2; i++)
+      {
+        if(piece[m.px2][i].type != NOTHING)
+        {
+          return ROOK_BLOCKED;
+        }
+      }
+      for(i = m.px1 + 1; i < m.px2; i++)
+      {
+        if(piece[i][py2].type != NOTHING)
+        {
+          return ROOK_BLOCKED;
+        }
+      }
     }
+    if(t1 == KNIGHT) // knight movement
+    {
+      int dx = abs(m.px1 - m.px2);
+      int dy = abs(m.py1 - m.py2);
+      if(((dx != 1) || (dy != 2)) && ((dx != 2) || (dy != 1)))
+      {
+        return KNIGHT_INVALID;
+      }
+      if((t2 != NOTHING) && (c1 != c2))
+      {
+        return KNIGHT_COLOR;
+      }
+    if(t1 == BISHOP) // bishop movement
+    {
+      int dx = abs(m.px1 - m.px2);
+      int dy = abs(m.py1 - m.py2);
+      if(dx != dy)
+      {
+        return BISHOP_INVALID;
+      }
+      if((t2 != NOTHING) && (c1 != c2))
+      {
+        return BISHOP_COLOR;
+      }
+      int fx = 1, fy = 1;
+      if(m.px2 < m.px1)
+      {
+        fx = -1;
+      }
+      if(m.py2 < m.py1)
+      {
+        fy = -1;
+      }
+      for(i = 1; i < dx; i++)
+      {
+        if(piece[m.px1 + fx * i][m.py1 + fy * i].type != NOTHING)
+        {
+          return BISHOP_BLOCKED;
+        }
+      }
+    }
+    if(t1 == QUEEN) // queen movement
+    {
+      if((t2 != NOTHING) && (c1 != c2))
+      {
+        return QUEEN_COLOR;
+      }
+      int dx = abs(m.px1 - m.px2);
+      int dy = abs(m.py1 - m.py2);
+      if((dx == 0) || (dy == 0))
+      { // rook type movement
+        for(i = m.py1 + 1; i < m.py2; i++)
+        {
+          if(piece[m.px2][i].type != NOTHING)
+          {
+            return QUEEN_BLOCKED;
+          }
+        }
+        for(i = m.px1 + 1; i < m.px2; i++)
+        {
+          if(piece[i][py2].type != NOTHING)
+          {
+            return QUEEN_BLOCKED;
+          }
+        }
+      }
+      else
+      { // bishop type movement
+        if(dx != dy)
+        {
+          return QUEEN_INVALID;
+        }
+        int fx = 1, fy = 1;
+        if(m.px2 < m.px1)
+        {
+          fx = -1;
+        }
+        if(m.py2 < m.py1)
+        {
+          fy = -1;
+        }
+        for(i = 1; i < dx; i++)
+        {
+          if(piece[m.px1 + fx * i][m.py1 + fy * i].type != NOTHING)
+          {
+            return QUEEN_BLOCKED;
+          }
+        }
+      }
+    }
+    if(t1 == KING) // king movement
+    {
+      if((t2 != NOTHING) && (c1 != c2))
+      {
+        return KING_COLOR;
+      }
+      int dx = abs(m.px1 - m.px2);
+      int dy = abs(m.py1 - m.py2);
+      if((dx > 1) || (dy > 1))
+      {
+        return KING_INVALID;
+      }
+    }
+  }
+  // test the move to see if it puts you into check
+  Board test_board(*this);
+  if(test_board.do_move(m)
+  {
+    return BASIC_TERRIBLE;
+  }
+  int status = test_board.get_status();
+  if(white_to_move && (status == 1))
+  {
+    return BASIC_CHECK;
+  }
+  if(! white_to_move && (status == 2))
+  {
+    return BASIC_CHECK;
+  }
+  if(status == 3)
+  {
+    return BASIC_CHECK;
   }
   return 0;
 }
@@ -401,6 +556,34 @@ int Board::do_move(Move m)
     }
   }
   return -1;
+}
+
+int Board::get_status()
+{
+  int result = 0, i, j;
+  for(i = 0; i < MAX_CHESS_SIZE; i++)
+  {
+    for(j = 0; j < MAX_CHESS_SIZE; j++)
+    {
+      if(piece[i][j].type == KING)
+      {
+        if(is_threatened(i, j))
+        {
+          result++;
+          if(piece[i][j].color == BLACK)
+          {
+            result++;
+          }
+        }
+      }
+    }
+  }
+  return result;
+}
+
+bool Board::is_threatened(int px, int py)
+{
+  return false;
 }
 
 /* Piece implementation */
