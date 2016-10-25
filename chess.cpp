@@ -1,4 +1,5 @@
 #include "chess.hpp"
+#include "cmrv.hpp"
 #include <cstring>
 #include <cmath>
 
