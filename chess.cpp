@@ -140,7 +140,7 @@ int Board::can_move(Move m)
       {
         return CASTLING_OCCUPIED;
       }
-      if(is_threatened(m.px2, i) && (i != m.py1 + 1))
+      if(is_threatened(m.px2, i, c1) && (i != m.py1 + 1))
       {
         return CASTLING_CHECK;
       }
@@ -151,12 +151,12 @@ int Board::can_move(Move m)
       {
         return CASTLING_OCCUPIED;
       }
-      if(is_threatened(m.px2, i))
+      if(is_threatened(m.px2, i, c1))
       {
         return CASTLING_CHECK;
       }
     }
-    if(is_threatened(m.px2, m.py2))
+    if(is_threatened(m.px2, m.py2, c1))
     {
       return CASTLING_CHECK;
     }
@@ -617,7 +617,7 @@ int Board::get_status()
     {
       if(pieces[i][j].type == KING)
       {
-        if(is_threatened(i, j))
+        if(is_threatened(i, j, pieces[i][j].color))
         {
           result++;
           if(pieces[i][j].color == BLACK)
@@ -631,8 +631,51 @@ int Board::get_status()
   return result;
 }
 
-bool Board::is_threatened(int px, int py)
+bool Board::is_threatened(int px, int py, Color c)
 {
+  if(c == WHITE) // black pawns
+  {
+    px--; py--;
+    if(!out_of_board(px, py))
+    {
+      if((pieces[px][py].color == BLACK) && (pieces[px][py].type == PAWN))
+      {
+        return true;
+      }
+    }
+    py += 2;
+    if(!out_of_board(px, py))
+    {
+      if((pieces[px][py].color == BLACK) && (pieces[px][py].type == PAWN))
+      {
+        return true;
+      }
+    }
+    px++; py--;
+  }
+  else // white pawns
+  {
+    px++; py--;
+    if(!out_of_board(px, py))
+    {
+      if((pieces[px][py].color == WHITE) && (pieces[px][py].type == PAWN))
+      {
+        return true;
+      }
+    }
+    py += 2;
+    if(!out_of_board(px, py))
+    {
+      if((pieces[px][py].color == WHITE) && (pieces[px][py].type == PAWN))
+      {
+        return true;
+      }
+    }
+  }
+  // rooks or queens
+  // bishops or queens
+  // knights
+  // enemy king
   return false;
 }
 
@@ -664,5 +707,13 @@ Move::Move(char px1, int py1, char px2, int py2, char special)
   this -> px2 = px2 - 'a';
   this -> py2 = py2 - 1;
   this -> special = special;
+}
+
+/* Misc implementation */
+
+bool out_of_board(int px, int py)
+{
+  return ((px >= 0) && (py >= 0) && 
+          (px < MAX_CHESS_SIZE) && (py < MAX_CHESS_SIZE));
 }
 

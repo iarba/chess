@@ -43,7 +43,7 @@ public:
   int can_move(Move m);
   int do_move(Move m);
   int get_status();
-  bool is_threatened(int px, int py);
+  bool is_threatened(int px, int py, Color c);
   bool white_to_move;
   Piece **pieces;
   vector<Move> history;
@@ -58,5 +58,9 @@ protected:
  * 2 - black is in check
  * 3 - both players are in check
  */
+
+/* misc functions */
+
+bool out_of_board(int px, int py);
 
 #endif
