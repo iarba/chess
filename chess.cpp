@@ -2,6 +2,7 @@
 #include "cmrv.hpp"
 #include <cstring>
 #include <cmath>
+#include <cstdio>
 
 /* Board implementation */
 
@@ -73,6 +74,11 @@ Board::~Board()
 
 int Board::can_move(Move m)
 {
+  if(testing)
+  {
+    return 0;
+  }
+  printf("checking the following move: %d %d %d %d %c\n", m.px1, m.py1, m.px2, m.py2, m.special);
   if((m.px1 < 0) || (m.py1 < 0) || (m.px1 < 0) || (m.py1 < 0))
   {
     return BASIC_INVALID_MOVE;
@@ -157,7 +163,6 @@ int Board::can_move(Move m)
   }
   if(m.special == 'E') // en passant
   {
-    cout << "en passant attempted";
     Color c2 = pieces[m.px1][m.py2].color;
     Type t2 = pieces[m.px1][m.py2].type;
     int m2 = pieces[m.px1][m.py2].moves;
@@ -204,7 +209,7 @@ int Board::can_move(Move m)
       }
     }
   }
-  if(strchr("ROOK_L KNIGHT_L BISHOP_L QUEEN_L", m.special) && (m.special != 0))
+  if(strchr("RNBQ", m.special) && (m.special != 0))
   { // promotion move
     if((m.px2 != 0) && (m.px2 != 7))
     {
@@ -334,24 +339,38 @@ int Board::can_move(Move m)
       {
         return ROOK_INVALID;
       }
-      if((t2 != NOTHING) && (c1 != c2))
+      if((t2 != NOTHING) && (c1 == c2))
       {
         return ROOK_COLOR;
       }
-      for(i = m.py1 + 1; i < m.py2; i++)
-      {
-        if(pieces[m.px2][i].type != NOTHING)
+        for(i = m.py1 + 1; i < m.py2; i++)
         {
-          return ROOK_BLOCKED;
+          if(pieces[m.px2][i].type != NOTHING)
+          {
+            return ROOK_BLOCKED;
+          }
         }
-      }
-      for(i = m.px1 + 1; i < m.px2; i++)
-      {
-        if(pieces[i][m.py2].type != NOTHING)
+        for(i = m.py1 - 1; i > m.py2; i--)
         {
-          return ROOK_BLOCKED;
+          if(pieces[m.px2][i].type != NOTHING)
+          {
+            return ROOK_BLOCKED;
+          }
         }
-      }
+        for(i = m.px1 + 1; i < m.px2; i++)
+        {
+          if(pieces[i][m.py2].type != NOTHING)
+          {
+            return ROOK_BLOCKED;
+          }
+        }
+        for(i = m.px1 - 1; i > m.px2; i--)
+        {
+          if(pieces[i][m.py2].type != NOTHING)
+          {
+            return ROOK_BLOCKED;
+          }
+        }
     }
     if(t1 == KNIGHT) // knight movement
     {
@@ -361,7 +380,7 @@ int Board::can_move(Move m)
       {
         return KNIGHT_INVALID;
       }
-      if((t2 != NOTHING) && (c1 != c2))
+      if((t2 != NOTHING) && (c1 == c2))
       {
         return KNIGHT_COLOR;
       }
@@ -374,7 +393,7 @@ int Board::can_move(Move m)
       {
         return BISHOP_INVALID;
       }
-      if((t2 != NOTHING) && (c1 != c2))
+      if((t2 != NOTHING) && (c1 == c2))
       {
         return BISHOP_COLOR;
       }
@@ -397,7 +416,8 @@ int Board::can_move(Move m)
     }
     if(t1 == QUEEN) // queen movement
     {
-      if((t2 != NOTHING) && (c1 != c2))
+      printf("checking queen out\n");
+      if((t2 != NOTHING) && (c1 == c2))
       {
         return QUEEN_COLOR;
       }
@@ -405,10 +425,20 @@ int Board::can_move(Move m)
       int dy = abs(m.py1 - m.py2);
       if((dx == 0) || (dy == 0))
       { // rook type movement
+        printf("checking\n");
         for(i = m.py1 + 1; i < m.py2; i++)
         {
           if(pieces[m.px2][i].type != NOTHING)
           {
+            printf("checked %d %d\n", m.px2, i);
+            return QUEEN_BLOCKED;
+          }
+        }
+        for(i = m.py1 - 1; i > m.py2; i--)
+        {
+          if(pieces[m.px2][i].type != NOTHING)
+          {
+            printf("checked %d %d\n", m.px2, i);
             return QUEEN_BLOCKED;
           }
         }
@@ -416,6 +446,15 @@ int Board::can_move(Move m)
         {
           if(pieces[i][m.py2].type != NOTHING)
           {
+            printf("checked %d %d\n", i, m.py2);
+            return QUEEN_BLOCKED;
+          }
+        }
+        for(i = m.px1 - 1; i > m.px2; i--)
+        {
+          if(pieces[i][m.py2].type != NOTHING)
+          {
+            printf("checked %d %d\n", i, m.py2);
             return QUEEN_BLOCKED;
           }
         }
@@ -446,7 +485,7 @@ int Board::can_move(Move m)
     }
     if(t1 == KING) // king movement
     {
-      if((t2 != NOTHING) && (c1 != c2))
+      if((t2 != NOTHING) && (c1 == c2))
       {
         return KING_COLOR;
       }
@@ -483,7 +522,7 @@ int Board::can_move(Move m)
 
 int Board::do_move(Move m)
 {
-  if((testing) || (can_move(m) == 0))
+  if(can_move(m) == 0)
   {
     en_passant_loc = -1;
     history.push_back(m);
@@ -492,7 +531,7 @@ int Board::do_move(Move m)
     int m0;
     if(m.special == 'O') // castling
     {
-      if(m.px1 == 0) // on queen's side
+      if(m.py1 == 0) // on queen's side
       {
         c0 = pieces[m.px1][m.py1].color;
         t0 = pieces[m.px1][m.py1].type;
