@@ -78,12 +78,12 @@ int Board::can_move(Move m)
   {
     return 0;
   }
-  printf("checking the following move: %d %d %d %d %c\n", m.px1, m.py1, m.px2, m.py2, m.special);
   if((m.px1 < 0) || (m.py1 < 0) || (m.px1 < 0) || (m.py1 < 0))
   {
     return BASIC_INVALID_MOVE;
   }
   int i, j;
+  bool checked = false;
   j = MAX_CHESS_SIZE;
   if((m.px1 >= j) || (m.py1 >= j) || (m.px1 >= j) || (m.py1 >= j))
   {
@@ -109,6 +109,7 @@ int Board::can_move(Move m)
   int m2 = pieces[m.px2][m.py2].moves;
   if(m.special == 'O') // castling
   {
+    checked = true;
     if(t1 != ROOK)
     {
       return CASTLING_NOT_ROOK;
@@ -163,6 +164,7 @@ int Board::can_move(Move m)
   }
   if(m.special == 'E') // en passant
   {
+    checked = true;
     Color c2 = pieces[m.px1][m.py2].color;
     Type t2 = pieces[m.px1][m.py2].type;
     int m2 = pieces[m.px1][m.py2].moves;
@@ -211,6 +213,7 @@ int Board::can_move(Move m)
   }
   if(strchr("RNBQ", m.special) && (m.special != 0))
   { // promotion move
+    checked = true;
     if((m.px2 != 0) && (m.px2 != 7))
     {
       return PROMOTE_NO;
@@ -252,6 +255,7 @@ int Board::can_move(Move m)
   }
   if(m.special == 0) // normal move
   {
+    checked = true;
     if(t1 == PAWN) // pawn movement
     {
       if(abs(m.px2 - m.px1) == 2) // forward 2
@@ -416,7 +420,6 @@ int Board::can_move(Move m)
     }
     if(t1 == QUEEN) // queen movement
     {
-      printf("checking queen out\n");
       if((t2 != NOTHING) && (c1 == c2))
       {
         return QUEEN_COLOR;
@@ -425,12 +428,10 @@ int Board::can_move(Move m)
       int dy = abs(m.py1 - m.py2);
       if((dx == 0) || (dy == 0))
       { // rook type movement
-        printf("checking\n");
         for(i = m.py1 + 1; i < m.py2; i++)
         {
           if(pieces[m.px2][i].type != NOTHING)
           {
-            printf("checked %d %d\n", m.px2, i);
             return QUEEN_BLOCKED;
           }
         }
@@ -438,7 +439,6 @@ int Board::can_move(Move m)
         {
           if(pieces[m.px2][i].type != NOTHING)
           {
-            printf("checked %d %d\n", m.px2, i);
             return QUEEN_BLOCKED;
           }
         }
@@ -446,7 +446,6 @@ int Board::can_move(Move m)
         {
           if(pieces[i][m.py2].type != NOTHING)
           {
-            printf("checked %d %d\n", i, m.py2);
             return QUEEN_BLOCKED;
           }
         }
@@ -454,7 +453,6 @@ int Board::can_move(Move m)
         {
           if(pieces[i][m.py2].type != NOTHING)
           {
-            printf("checked %d %d\n", i, m.py2);
             return QUEEN_BLOCKED;
           }
         }
@@ -496,6 +494,10 @@ int Board::can_move(Move m)
         return KING_INVALID;
       }
     }
+  }
+  if(!checked)
+  {
+    return BASIC_SPECIAL;
   }
   // test the move to see if it puts you into check
   Board test_board(*this);
@@ -672,10 +674,224 @@ bool Board::is_threatened(int px, int py, Color c)
       }
     }
   }
+  bool chkdir[4];
+  int i;
+  Type t0;
+  Color c0;
   // rooks or queens
+  chkdir[0] = true;
+  chkdir[1] = true;
+  chkdir[2] = true;
+  chkdir[3] = true;
+  for(i = 1; i < MAX_CHESS_SIZE; i++)
+  {
+    if((chkdir[0]) && (!out_of_board(px - i, py)))
+    {
+      t0 = pieces[px - i][py].type;
+      c0 = pieces[px - i][py].color;
+      if(((t0 == ROOK) || (t0 == QUEEN)) && (c0 != c))
+      {
+        return true;
+      }
+      if(t0 != NOTHING)
+      {
+        chkdir[0] = false;
+      }
+    }
+    if((chkdir[1]) && (!out_of_board(px + i, py)))
+    {
+      t0 = pieces[px + i][py].type;
+      c0 = pieces[px + i][py].color;
+      if(((t0 == ROOK) || (t0 == QUEEN)) && (c0 != c))
+      {
+        return true;
+      }
+      if(t0 != NOTHING)
+      {
+        chkdir[1] = false;
+      }
+    } 
+    if((chkdir[2]) && (!out_of_board(px, py - i)))
+    {
+      t0 = pieces[px][py - i].type;
+      c0 = pieces[px][py - i].color;
+      if(((t0 == ROOK) || (t0 == QUEEN)) && (c0 != c))
+      {
+        return true;
+      }
+      if(t0 != NOTHING)
+      {
+        chkdir[2] = false;
+      }
+    }
+    if((chkdir[3]) && (!out_of_board(px, py + i)))
+    {
+      t0 = pieces[px][py + i].type;
+      c0 = pieces[px][py + i].color;
+      if(((t0 == ROOK) || (t0 == QUEEN)) && (c0 != c))
+      {
+        return true;
+      }
+      if(t0 != NOTHING)
+      {
+        chkdir[3] = false;
+      }
+    }
+  }
   // bishops or queens
+  chkdir[0] = true;
+  chkdir[1] = true;
+  chkdir[2] = true;
+  chkdir[3] = true;
+  for(i = 1; i < MAX_CHESS_SIZE; i++)
+  {
+    if((chkdir[0]) && (!out_of_board(px - i, py - i)))
+    {
+      t0 = pieces[px - i][py - i].type;
+      c0 = pieces[px - i][py - i].color;
+      if(((t0 == BISHOP) || (t0 == QUEEN)) && (c0 != c))
+      {
+        return true;
+      }
+      if(t0 != NOTHING)
+      {
+        chkdir[0] = false;
+      }
+    }
+    if((chkdir[1]) && (!out_of_board(px - i, py + i)))
+    {
+      t0 = pieces[px - i][py + i].type;
+      c0 = pieces[px - i][py + i].color;
+      if(((t0 == BISHOP) || (t0 == QUEEN)) && (c0 != c))
+      {
+        return true;
+      }
+      if(t0 != NOTHING)
+      {
+        chkdir[1] = false;
+      }
+    }
+    if((chkdir[2]) && (!out_of_board(px + i, py - i)))
+    {
+      t0 = pieces[px + i][py - i].type;
+      c0 = pieces[px + i][py - i].color;
+      if(((t0 == BISHOP) || (t0 == QUEEN)) && (c0 != c))
+      {
+        return true;
+      }
+      if(t0 != NOTHING)
+      {
+        chkdir[2] = false;
+      }
+    }
+    if((chkdir[3]) && (!out_of_board(px + i, py + i)))
+    {
+      t0 = pieces[px + i][py + i].type;
+      c0 = pieces[px + i][py + i].color;
+      if(((t0 == BISHOP) || (t0 == QUEEN)) && (c0 != c))
+      {
+        return true;
+      }
+      if(t0 != NOTHING)
+      {
+        chkdir[3] = false;
+      }
+    }
+  }
   // knights
+  if(!out_of_board(px + 1, py + 2))
+  {
+    t0 = pieces[px + 1][py + 2].type;
+    c0 = pieces[px + 1][py + 2].color;
+    if((t0 == KNIGHT) && (c0 != c))
+    {
+      return true;
+    }
+  }
+  if(!out_of_board(px + 1, py - 2))
+  {
+    t0 = pieces[px + 1][py - 2].type;
+    c0 = pieces[px + 1][py - 2].color;
+    if((t0 == KNIGHT) && (c0 != c))
+    {
+      return true;
+    }
+  }
+  if(!out_of_board(px - 1, py + 2))
+  {
+    t0 = pieces[px - 1][py + 2].type;
+    c0 = pieces[px - 1][py + 2].color;
+    if((t0 == KNIGHT) && (c0 != c))
+    {
+      return true;
+    }
+  }
+  if(!out_of_board(px - 1, py - 2))
+  {
+    t0 = pieces[px - 1][py - 2].type;
+    c0 = pieces[px - 1][py - 2].color;
+    if((t0 == KNIGHT) && (c0 != c))
+    {
+      return true;
+    }
+  }
+  if(!out_of_board(px + 2, py + 1))
+  {
+    t0 = pieces[px + 2][py + 1].type;
+    c0 = pieces[px + 2][py + 1].color;
+    if((t0 == KNIGHT) && (c0 != c))
+    {
+      return true;
+    }
+  }
+  if(!out_of_board(px + 2, py - 1))
+  {
+    t0 = pieces[px + 2][py - 1].type;
+    c0 = pieces[px + 2][py - 1].color;
+    if((t0 == KNIGHT) && (c0 != c))
+    {
+      return true;
+    }
+  }
+  if(!out_of_board(px - 2, py + 1))
+  {
+    t0 = pieces[px - 2][py + 1].type;
+    c0 = pieces[px - 2][py + 1].color;
+    if((t0 == KNIGHT) && (c0 != c))
+    {
+      return true;
+    }
+  }
+  if(!out_of_board(px - 2, py - 1))
+  {
+    t0 = pieces[px - 2][py - 1].type;
+    c0 = pieces[px - 2][py - 1].color;
+    if((t0 == KNIGHT) && (c0 != c))
+    {
+      return true;
+    }
+  }
   // enemy king
+  int j;
+  for(i = -1; i <= 1; i++)
+  {
+    for(j = -1; j <= 1; j++)
+    {
+      if((i == 0) && (j == 0))
+      {
+        continue;
+      }
+      if(!out_of_board(px + i, py + j))
+      {
+        t0 = pieces[px + i][py + i].type;
+        c0 = pieces[px + i][py + i].color;
+        if((t0 == KING) && (c0 != c))
+        {
+          return true;
+        }
+      }
+    }
+  }
   return false;
 }
 
@@ -713,7 +929,7 @@ Move::Move(char px1, int py1, char px2, int py2, char special)
 
 bool out_of_board(int px, int py)
 {
-  return ((px >= 0) && (py >= 0) && 
-          (px < MAX_CHESS_SIZE) && (py < MAX_CHESS_SIZE));
+  return ((px < 0) || (py < 0) || 
+          (px >= MAX_CHESS_SIZE) || (py >= MAX_CHESS_SIZE));
 }
 
